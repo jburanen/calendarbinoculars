@@ -1,0 +1,14 @@
+# Files Claude should not spend context on.
+# (Claude Code also honors .gitignore; this is an extra, Claude-specific filter.)
+
+# Version control internals
+.git/
+
+# Binary assets — nothing useful to read as text
+src/favicon.ico
+*.ico
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini

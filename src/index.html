@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang='en' data-bs-theme='dark'>
+  <head>
+    <meta charset='utf-8' />
+
+    <title>Travel Agent</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap/dist/css/bootstrap.min.css' rel='stylesheet'>
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css' rel='stylesheet'>
+    
+    <script src='https://cdn.jsdelivr.net/npm/moment/moment.min.js'></script>
+
+    <!-- FullCalendar v6 global bundle (injects its own CSS, no separate stylesheet needed) -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js'></script>
+    <!-- Google Calendar connector (required for googleCalendarId event sources) -->
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.21/index.global.min.js'></script>
+
+    <!-- Local runtime config (gitignored). Copy config.example.js to config.js. -->
+    <script src='config.js'></script>
+
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        background: #16181c;
+        color: #e6e8ea;
+      }
+
+      #calWrap {
+        padding: 16px;
+      }
+
+      /* Dark theme for FullCalendar, applied through its own CSS variables so
+         event colors (set per Google calendar) are untouched. */
+      .fc {
+        --fc-page-bg-color: #16181c;
+        --fc-border-color: #34383f;
+        --fc-neutral-bg-color: #212429;
+        --fc-neutral-text-color: #9aa0a6;
+        --fc-today-bg-color: rgba(64, 156, 255, 0.22);
+        --fc-highlight-color: rgba(255, 255, 255, 0.10);
+        --fc-list-event-hover-bg-color: #212429;
+        color: #e6e8ea;
+      }
+
+      /* Keep day numbers, weekday headers, and the title legible on dark. */
+      .fc .fc-daygrid-day-number,
+      .fc .fc-col-header-cell-cushion,
+      .fc .fc-toolbar-title {
+        color: #e6e8ea;
+      }
+
+      /* Day numbers and month names are <a> links — drop the underline. */
+      .fc .fc-daygrid-day-number {
+        text-decoration: none;
+      }
+
+      .fc table {
+        font-size: 1em;
+      }
+
+      .fc .fc-toolbar-title {
+        font-size: 1.1em;
+      }
+
+      /* Give every day cell an appealing minimum height, but let it grow
+         vertically to fit however many events land in it. */
+      .fc .fc-daygrid-day-frame {
+        min-height: 60px;
+      }
+
+      /* Highlight the first day of each month so month boundaries are obvious
+         in the otherwise-continuous grid. */
+      .fc .fc-daygrid-day.first-of-month {
+        background: rgba(237, 193, 75, 0.12);
+      }
+
+      /* On day 1, the day number is replaced with the month name — make it
+         read as a label rather than a stray number. */
+      .fc .fc-daygrid-day.first-of-month .fc-daygrid-day-number {
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .02em;
+      }
+
+      /* Add a little vertical gap between stacked event pills on the same day. */
+      .fc .fc-daygrid-event-harness + .fc-daygrid-event-harness {
+        margin-top: 2px;
+      }
+    </style>
+    
+    <script>
+
+      document.addEventListener('DOMContentLoaded', function() {
+
+        var num_months = 9;
+
+        if (!window.APP_CONFIG) {
+          document.getElementById('calWrap').textContent =
+            'Missing config.js — copy config.example.js to config.js and add your API key and calendars.';
+          return;
+        }
+
+        var api_key = window.APP_CONFIG.apiKey;
+        var calendars = window.APP_CONFIG.calendars;
+        var header_toolbar = { left: 'title', center: '', right: '' };
+
+        // One continuous grid spanning num_months, starting at the first of
+        // the current month. visibleRange + the generic 'dayGrid' view renders
+        // week rows straight across month boundaries with no hard breaks.
+        var start = moment().startOf('month');
+        var end = start.clone().add(num_months, 'months');
+
+        var calendarEl = document.createElement("div");
+        document.getElementById('calWrap').appendChild(calendarEl);
+
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          themeSystem: 'bootstrap5',
+          initialView: 'dayGrid',
+          visibleRange: {
+            start: start.format('YYYY-MM-DD'),
+            end: end.format('YYYY-MM-DD')
+          },
+          headerToolbar: header_toolbar,
+          googleCalendarApiKey: api_key,
+          eventSources: calendars,
+          showNonCurrentDates: true,
+          firstDay: 1,
+          height: 'auto',
+          dayCellClassNames: function(arg) {
+            return arg.date.getDate() === 1 ? ['first-of-month'] : [];
+          },
+          dayCellDidMount: function(arg) {
+            // On day 1 of each month, show the month name in place of "1".
+            if (arg.date.getDate() === 1) {
+              var num = arg.el.querySelector('.fc-daygrid-day-number');
+              if (num) {
+                num.textContent = moment(arg.date).format('MMMM');
+              }
+            }
+          }
+        });
+
+        calendar.render();
+
+      });
+
+    </script>
+  </head>
+  <body>
+    <div id="calWrap"></div>
+  </body>
+</html>
+

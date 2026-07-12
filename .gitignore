@@ -1,0 +1,15 @@
+# Local runtime config — contains the Google Calendar API key. Never commit.
+src/config.js
+
+# Environment files (kept out of the repo; commit only the example)
+.env
+.env.*
+!.env.example
+
+# Claude Code personal/local settings
+.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,9 @@
+services:
+    nginx-calview:
+        container_name: nginx-calview
+        image: nginx
+        restart: unless-stopped
+        ports:
+            - 0.0.0.0:8082:80
+        volumes:
+            - ./src:/usr/share/nginx/html
