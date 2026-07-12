@@ -94,3 +94,7 @@ removing it from a file (or even from git history) does not un-leak an already-p
 - [Bootstrap 5](https://getbootstrap.com/) (`themeSystem: 'bootstrap5'`, dark mode)
 - [Moment.js](https://momentjs.com/) for date math and month labels
 - `nginx` (via Docker Compose) for static serving
+
+## License
+
+Released under the [MIT License](LICENSE).
