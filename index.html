@@ -241,7 +241,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.3";
+const APP_VERSION = "2.0.4";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -1092,6 +1092,22 @@ $("closeSettings").onclick=closePanel;
 $("doneBtn").onclick=closePanel;
 $("scrim").onclick=closePanel;
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closePanel(); hidePop(); } });
+// Arrow keys: ←/→ move the start month; ↑/↓ step the month count in the multi-column
+// desktop view (in single-column and mobile views they scroll as usual).
+const MONTH_STEPS=[1,2,3,4,6,9,12];
+document.addEventListener("keydown",e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||startY==null) return;
+  if(document.body.classList.contains("open")) return;
+  if(e.target.closest && e.target.closest("input,select,textarea,[contenteditable]")) return;
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+    e.preventDefault(); hidePop(); shift(e.key==="ArrowLeft"?-1:1); return;
+  }
+  if(e.key==="ArrowUp"||e.key==="ArrowDown"){
+    if(mq.matches || singleCol) return;
+    const i=MONTH_STEPS.indexOf(numMonths), j=i+(e.key==="ArrowUp"?1:-1);
+    if(j>=0 && j<MONTH_STEPS.length){ e.preventDefault(); setMonths(MONTH_STEPS[j]); }
+  }
+});
 let rT; window.addEventListener("resize",()=>{ clearTimeout(rT); rT=setTimeout(()=>{ hidePop(); render(); },150); });
 $("forget").onclick=()=>{
   store.del(LS_SETTINGS); store.del(LS_SETTINGS_V2); store.del(LS_HIDDEN_CFG);
