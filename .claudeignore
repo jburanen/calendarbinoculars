@@ -5,7 +5,7 @@
 .git/
 
 # Binary assets — nothing useful to read as text
-src/favicon.ico
+favicon.ico
 *.ico
 
 # OS / editor cruft

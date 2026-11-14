@@ -6,6 +6,7 @@
 
 # Claude Code personal/local settings
 .claude/settings.local.json
+.claude/memory/
 
 # OS / editor cruft
 .DS_Store
@@ -18,5 +19,5 @@ desktop.ini
 # Local compose file (copy from docker-compose.yml.example)
 docker-compose.yml
 
-# Optional app config (copy from src/config.yaml.example); holds API keys
-src/config.yaml
+# Optional app config (copy from config.yaml.example); holds API keys
+/config.yaml

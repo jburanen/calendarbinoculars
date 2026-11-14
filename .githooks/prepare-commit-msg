@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Adds a Claude co-author trailer to the commit message, but ONLY when a Claude
+# Code session actually modified files this session. The session drops a sentinel
+# file (see the PostToolUse hook in .claude/settings.local.json); this hook
+# consumes it: append the trailer once, then remove the sentinel so unrelated
+# later commits aren't tagged.
+#
+# git-for-Windows always runs hooks through its bundled bash, so this is portable.
+
+MSG_FILE="$1"
+SENTINEL="$(git rev-parse --git-dir)/CLAUDE_COAUTHOR"
+TRAILER="Co-Authored-By: Claude <noreply@anthropic.com>"
+
+[ -f "$SENTINEL" ] || exit 0
+
+# Don't double-add if it's already there (e.g. Claude authored the commit itself).
+if ! grep -qF "$TRAILER" "$MSG_FILE"; then
+  printf '\n%s\n' "$TRAILER" >> "$MSG_FILE"
+fi
+
+rm -f "$SENTINEL"
+exit 0

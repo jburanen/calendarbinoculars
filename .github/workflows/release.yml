@@ -1,23 +1,62 @@
-# Cut a release by pushing a version tag:
-#   git tag v1.0.0 && git push origin v1.0.0
-# This publishes ghcr.io/jburanen/calendarbinoculars:{1.0.0,1.0,1,latest}
-# and a GitHub Release with a zip of the static files attached.
+# Releases automatically: every push to main whose VERSION has no vX.Y.Z tag yet builds
+# and publishes that version. The .githooks/pre-commit hook bumps VERSION on each commit,
+# so in practice every push is a release.
+#
+# Each release publishes:
+#   - ghcr.io/jburanen/calendarbinoculars:{X.Y.Z, X.Y, X, latest}
+#   - a vX.Y.Z git tag and GitHub Release with a zip of the static files attached
 name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
+  workflow_dispatch:        # re-run by hand (e.g. after a failure); no-op if already released
 
 permissions:
-  contents: write   # create the GitHub Release
+  contents: write   # create the tag and GitHub Release
   packages: write   # push to GHCR
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  release:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0     # full history so existing tags are visible
+
+      - id: v
+        run: |
+          v=$(tr -d '[:space:]' < VERSION)
+          if ! [[ $v =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=VERSION::VERSION '$v' is not in X.Y.Z form"; exit 1
+          fi
+          if ! grep -q "^const APP_VERSION = \"$v\";" index.html; then
+            echo "::error file=index.html::APP_VERSION in index.html doesn't match VERSION ($v). Is the pre-commit hook enabled? (git config core.hooksPath .githooks)"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "v$v is already released; nothing to do."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v5
 
@@ -35,9 +74,9 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=semver,pattern={{version}},value=v${{ env.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ env.VERSION }}
+            type=semver,pattern={{major}},value=v${{ env.VERSION }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -51,9 +90,13 @@ jobs:
       - name: Package static files
         run: |
           mkdir -p dist
-          cd src && zip -j "../dist/calendarbinoculars-${GITHUB_REF_NAME}.zip" index.html favicon.ico
+          zip -j "dist/calendarbinoculars-v${VERSION}.zip" index.html favicon.ico
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ env.VERSION }}
           files: dist/*.zip
           generate_release_notes: true
+          make_latest: true

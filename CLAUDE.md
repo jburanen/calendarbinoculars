@@ -5,19 +5,33 @@ from several public Google Calendars.
 
 ## Architecture
 
-- **`src/index.html`**: the entire application, with HTML, CSS and JS in one file. It has
-  no external libraries or CDNs, no build step and no server-side code.
-- **`src/favicon.ico`**: the site icon (binary).
-- **`src/config.yaml`** (optional, gitignored): the title plus read-only accounts (API keys
-  and calendars), fetched at startup. Its template is `src/config.yaml.example`. The release
-  image never includes it; mount it into the container instead.
+All app files live at the repo root. There is no `src/` folder.
+
+- **`index.html`**: the entire application, with HTML, CSS and JS in one file. It has no
+  external libraries or CDNs, no build step and no server-side code.
+- **`favicon.ico`**: the site icon (binary).
+- **`config.yaml`** (optional, gitignored): the title plus read-only accounts (API keys and
+  calendars), fetched at startup. Its template is `config.yaml.example`. The release image
+  never includes it; mount it into the container instead.
 - **`Dockerfile`**: the release image. It's `nginx:stable-alpine` with `index.html` and
-  `favicon.ico` copied in, and nothing else.
-- **`docker-compose.yml.example`**: the committed template. Copy it to `docker-compose.yml`,
-  which is gitignored and is the user's own copy for each machine. By default it mounts
-  `./src` read-only into nginx. Commented lines switch it to the GHCR release image.
-- **`.github/workflows/release.yml`**: runs on `v*.*.*` tags. It builds a multi-arch image,
-  pushes it to GHCR and creates a GitHub Release with a zip of the static files.
+  `favicon.ico` copied in, and nothing else. nginx is reconfigured to listen on **8080**
+  (from 2.0.1 on; 2.0.0 listened on 80), so the compose files map `8080:8080`.
+- **`docker-compose.yml.example`**: local dev. Copy it to `docker-compose.yml`, which is
+  gitignored. It mounts `index.html` and `favicon.ico` individually into nginx, and a
+  commented line mounts `config.yaml`. Never mount the repo root, because that would serve
+  `.git`. The deployment compose file (release image, no `config.yaml` needed) lives in the
+  README quick start.
+- **README** is deliberately short. Keep it that way: it's a simple tool with few knobs.
+- **`VERSION`**: the app version (`X.Y.Z`), mirrored in `index.html` as `const APP_VERSION`
+  and shown in the Settings footer.
+- **`.githooks/`**: tracked git hooks, enabled per clone with
+  `git config core.hooksPath .githooks`.
+  - `pre-commit` bumps the patch version on every commit, unless `VERSION` was changed in
+    the staged commit, and syncs `APP_VERSION`. Set `CALBIN_NO_BUMP=1` to skip it.
+  - `prepare-commit-msg` adds the Claude co-author trailer.
+- **`.github/workflows/release.yml`**: runs on every push to `main`. If no `vX.Y.Z` tag
+  exists yet for `VERSION`, it builds the multi-arch image, pushes it to GHCR, and creates
+  the tag and a GitHub Release with a zip of the static files.
 
 ## Running it
 
@@ -57,8 +71,11 @@ docker compose up -d                              # http://localhost:8082
 ## Conventions & gotchas
 
 - Keep it a single, dependency-free file. Don't add CDN libraries.
-- When you add a shipped file under `src/`, also add it to the `COPY` line in the
-  `Dockerfile`, to `.dockerignore` and to the zip step in `release.yml`.
-- A release is a pushed git tag such as `v1.2.3`. Don't hand-edit image tags.
+- When you add a shipped file, add it in four places: the `COPY` line in the `Dockerfile`,
+  `.dockerignore`, the zip step in `release.yml`, and a volume line in
+  `docker-compose.yml.example`.
+- Never hand-edit `APP_VERSION`, and don't create release tags by hand: the hook and the
+  workflow own them. To pick a minor or major bump, edit `VERSION` and stage it. Pushing to
+  `main` publishes a release, so it is outward-facing.
 - There's no test suite or linter. To verify a change, load the page, add a calendar and
   check that events render, on both desktop and mobile widths.

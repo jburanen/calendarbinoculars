@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#
+# Bumps the patch version on every commit (2.0.1 -> 2.0.2) and keeps the copy in
+# index.html (const APP_VERSION) in sync with VERSION.
+#
+# - To pick a version yourself (a minor or major bump), edit VERSION and stage it. If the
+#   staged VERSION differs from HEAD's, that version is used as-is, with no extra bump.
+# - To skip the bump for one commit (e.g. when amending): CALBIN_NO_BUMP=1 git commit ...
+#
+# The hook edits the staged copies directly (and the working-tree files to match), so
+# unstaged edits in index.html are never pulled into the commit.
+#
+# Enable it once per clone:  git config core.hooksPath .githooks
+
+set -euo pipefail
+[ "${CALBIN_NO_BUMP:-}" = "1" ] && exit 0
+cd "$(git rev-parse --show-toplevel)"
+
+semver='^[0-9]+\.[0-9]+\.[0-9]+$'
+staged=$(git show :VERSION 2>/dev/null | tr -d '[:space:]' || true)
+if [ -z "$staged" ]; then
+  echo "pre-commit: VERSION is not staged in this repo; skipping the version bump" >&2
+  exit 0
+fi
+if ! [[ $staged =~ $semver ]]; then
+  echo "pre-commit: VERSION '$staged' is not in X.Y.Z form" >&2
+  exit 1
+fi
+head=$(git show HEAD:VERSION 2>/dev/null | tr -d '[:space:]' || true)
+
+new=$staged
+if [ "$staged" = "$head" ]; then
+  IFS=. read -r major minor patch <<<"$staged"
+  new="$major.$minor.$((patch + 1))"
+fi
+
+# VERSION: update the staged copy and the working-tree file
+if [ "$new" != "$staged" ]; then
+  blob=$(printf '%s\n' "$new" | git hash-object -w --stdin)
+  git update-index --cacheinfo "100644,$blob,VERSION"
+  printf '%s\n' "$new" > VERSION
+fi
+
+# index.html: keep const APP_VERSION in step
+if git ls-files --error-unmatch index.html >/dev/null 2>&1; then
+  line="const APP_VERSION = \"$new\";"
+  cur=$(git show :index.html | grep -m1 '^const APP_VERSION = ' || true)
+  if [ -z "$cur" ]; then
+    echo "pre-commit: couldn't find the 'const APP_VERSION = \"...\";' line in index.html" >&2
+    exit 1
+  fi
+  if [ "$cur" != "$line" ]; then
+    expr="s/^const APP_VERSION = \"[^\"]*\";/$line/"
+    mode=$(git ls-files -s index.html | cut -d' ' -f1)
+    blob=$(git show :index.html | sed "$expr" | git hash-object -w --stdin)
+    git update-index --cacheinfo "$mode,$blob,index.html"
+    sed -i "$expr" index.html
+  fi
+fi
+
+if [ "$new" != "$head" ]; then echo "pre-commit: version ${head:-none} -> $new"; fi
+exit 0
