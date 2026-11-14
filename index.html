@@ -90,7 +90,8 @@
   .ev.more{margin-right:0;border-top-right-radius:0;border-bottom-right-radius:0}
 
   /* mobile: one continuous week stream */
-  .stream{margin:0 10px 30px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:clip}
+  /* capped width (grows with text size), centered; keeps a 10px gutter on narrow screens */
+  .stream{--streamw:calc(900px * var(--fs,1));margin:0 max(10px, calc((100% - var(--streamw)) / 2)) 30px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:clip}
   .stream .dowrow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));position:sticky;top:0;z-index:5;background:var(--head)}
   .stream .dowrow .dow:last-child,.stream .day:nth-child(7){border-right:none}
   .stream .weeks{border:none}
@@ -241,7 +242,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.6";
+const APP_VERSION = "2.0.7";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
