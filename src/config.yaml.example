@@ -1,0 +1,29 @@
+# Optional config for CalendarBinoculars.
+# Copy to config.yaml next to index.html (it's gitignored):
+#     cp config.yaml.example config.yaml
+#
+# Accounts listed here show up for every visitor, read-only in Settings. Visitors can
+# still add their own accounts in the browser, and hide or show calendars.
+#
+# SECURITY: config.yaml is served to the browser, so anyone who can open the page can
+# read these API keys. Restrict each key in the Google Cloud Console to the Google
+# Calendar API, and to your site's HTTP referrer if you can.
+
+# Page title. Optional; a title set in Settings takes priority.
+title: Calendar Binoculars
+
+accounts:
+  - name: Family                      # optional label shown in Settings
+    api_key: AIzaYOUR_API_KEY_HERE
+    calendars:
+      # A public iCal address, embed link, or Calendar ID.
+      - url: https://calendar.google.com/calendar/ical/family%40group.calendar.google.com/public/basic.ics
+        color: "#039BE5"              # optional; quote it, because # otherwise starts a comment
+      - url: en.usa#holiday@group.v.calendar.google.com
+        color: "#33B679"
+
+  - name: Work
+    api_key: AIzaANOTHER_API_KEY
+    calendars:
+      # A plain link works too; a color is then picked automatically.
+      - your-calendar-id@group.calendar.google.com

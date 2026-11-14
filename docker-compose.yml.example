@@ -1,0 +1,20 @@
+# Copy to docker-compose.yml (gitignored) and adjust for your machine:
+#   cp docker-compose.yml.example docker-compose.yml
+#   docker compose up -d
+#
+# As written, this serves ./src live from a clone, so edits show up on a browser refresh,
+# including an optional src/config.yaml.
+# To run a published release instead, swap the image and volume for the commented lines.
+services:
+    nginx-calbinocs:
+        container_name: nginx-calbinocs
+        image: nginx:stable-alpine
+        # image: ghcr.io/jburanen/calendarbinoculars:latest   # or pin a version, e.g. :1.0.0
+        restart: unless-stopped
+        ports:
+            - 0.0.0.0:8082:80
+        volumes:
+            - ./src:/usr/share/nginx/html:ro
+            # With the release image, mount just your config.yaml (optional). Create the file
+            # first: if it's missing, Docker makes an empty directory with that name instead.
+            # - ./config.yaml:/usr/share/nginx/html/config.yaml:ro

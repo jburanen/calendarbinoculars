@@ -1,5 +1,3 @@
-# Local runtime config — contains the Google Calendar API key. Never commit.
-src/config.js
 
 # Environment files (kept out of the repo; commit only the example)
 .env
@@ -13,3 +11,12 @@ src/config.js
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# VS Code workspace file (local editor setup)
+*.code-workspace
+
+# Local compose file (copy from docker-compose.yml.example)
+docker-compose.yml
+
+# Optional app config (copy from src/config.yaml.example); holds API keys
+src/config.yaml

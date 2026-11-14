@@ -1,0 +1,59 @@
+# Cut a release by pushing a version tag:
+#   git tag v1.0.0 && git push origin v1.0.0
+# This publishes ghcr.io/jburanen/calendarbinoculars:{1.0.0,1.0,1,latest}
+# and a GitHub Release with a zip of the static files attached.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write   # create the GitHub Release
+  packages: write   # push to GHCR
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Package static files
+        run: |
+          mkdir -p dist
+          cd src && zip -j "../dist/calendarbinoculars-${GITHUB_REF_NAME}.zip" index.html favicon.ico
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

@@ -1,0 +1,4 @@
+# Only src/index.html and src/favicon.ico are needed to build the image.
+*
+!src/index.html
+!src/favicon.ico
