@@ -65,6 +65,12 @@ docker compose up -d                              # http://localhost:8082
   (`body.fit`, or `.tight` for smaller screens). Events that overflow are hidden, and the
   day gets a `+N` badge (`markHidden()`).
 - **Mobile** (≤768px): one continuous stream of weeks, with alternating month shading.
+- **Version in the header:** `#appverNum` shows next to the date range, but only when it
+  fits on the same line (`fitVersion()`, which runs on every render) and never on mobile.
+  `checkForUpdate()` asks the GitHub API for the latest release, caches the answer in
+  `adc.latest` for 6 hours (failures too) and shows a "New version" link when that release
+  is newer than `APP_VERSION`. This needs the repo to be public; otherwise the API returns
+  404 and nothing shows.
 - The first month shown is remembered in `adc.start`. Any navigation (‹ ›, This Month, or
   the Start month field) updates it. `?start=YYYY-MM` in the URL overrides it.
 

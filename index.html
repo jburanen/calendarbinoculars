@@ -29,9 +29,16 @@
   .hl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
   h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em}
   #range{color:var(--muted);font-size:13px}
+  #appver{display:flex;gap:8px;align-items:baseline;white-space:nowrap;color:var(--muted);font-size:12px;opacity:.8}
+  #appver:empty,#appverNum.tight{display:none}
+  #newver{color:var(--accent);font-size:11px;font-weight:600;text-decoration:none;border:1px solid var(--accent);border-radius:999px;padding:0 7px;opacity:1}
+  #newver:hover{text-decoration:underline}
   .hm{flex:1;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;min-width:0}
   .nav{display:flex;gap:6px;align-items:center}
   .nav button{min-width:34px;padding:5px 10px;white-space:nowrap}
+  /* month arrows: drawn chevrons sized like the months picker's dropdown arrow */
+  .nav button.chev{align-self:stretch;display:inline-flex;align-items:center;justify-content:center;padding:0 9px}
+  .nav button.chev svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .nav select{padding:5px 8px;background:var(--card);cursor:pointer}
   .nav button.toggle[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
   #legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
@@ -173,14 +180,15 @@
   <div class="hl">
     <h1 id="title">Calendar Binoculars</h1>
     <div id="range"></div>
+    <div id="appver"><span id="appverNum"></span><a id="newver" target="_blank" rel="noopener" hidden>New version</a></div>
   </div>
   <div class="hm"><div id="legend"></div><div id="status"></div></div>
   <div class="nav">
     <select id="monthsSel" title="Months to show" aria-label="Months to show"><option value="1">1 month</option><option value="2">2 months</option><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="9">9 months</option><option value="12" selected>12 months</option></select>
     <button id="singleCol" class="toggle" title="Show months in a single column" aria-label="Single column" aria-pressed="false">☰<span class="lbl"> 1 column</span></button>
-    <button id="prev" title="Previous month" aria-label="Previous month">‹</button>
+    <button id="prev" class="chev" title="Previous month" aria-label="Previous month"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
     <button id="thisMonth">This Month</button>
-    <button id="next" title="Next month" aria-label="Next month">›</button>
+    <button id="next" class="chev" title="Next month" aria-label="Next month"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
     <button id="openSettings" title="Settings" aria-label="Settings">⚙︎<span class="lbl"> Settings</span></button>
   </div>
 </header>
@@ -233,7 +241,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.2";
+const APP_VERSION = "2.0.3";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -947,6 +955,7 @@ function render(){
   view.replaceChildren(frag);
   lastMap=map;
   requestAnimationFrame(markHidden);
+  fitVersion();
 }
 
 // When events don't fit in a fitted month, show "+N" on the affected days (click to see all)
@@ -966,6 +975,42 @@ function markHidden(){
     });
     counts.forEach((n,k)=>{ if(n && days[k] && days[k].dataset.dn){ const b=document.createElement("span"); b.className="morebadge"; b.textContent="+"+n; (days[k].querySelector(".num")||days[k]).appendChild(b); } });
   });
+}
+
+/* ---------- version + update check ---------- */
+// Show the version next to the date range only if it fits on the same line; otherwise hide it.
+// The "New version" link stays visible either way.
+function fitVersion(){
+  const num=$("appverNum"), range=$("range");
+  num.classList.remove("tight");
+  if(mq.matches || num.offsetTop>range.offsetTop+4) num.classList.add("tight");
+}
+const REPO="jburanen/calendarbinoculars", LS_LATEST="adc.latest", CHECK_EVERY=6*3600e3;
+function cmpVersion(a,b){
+  const p=s=>String(s).replace(/^v/,"").split(".").map(n=>parseInt(n,10)||0);
+  const x=p(a), y=p(b);
+  for(let i=0;i<3;i++){ const d=(x[i]||0)-(y[i]||0); if(d) return d; }
+  return 0;
+}
+// Ask GitHub for the latest release (cached for 6 hours per browser). Fails silently,
+// e.g. offline, rate-limited, or while the repository is private.
+async function checkForUpdate(){
+  let info=null;
+  try{ const c=JSON.parse(store.get(LS_LATEST)||"null"); if(c && Date.now()-c.at<CHECK_EVERY) info=c; }catch(e){}
+  if(!info){
+    info={tag:null, url:null, at:Date.now()};
+    try{
+      const r=await fetch(`https://api.github.com/repos/${REPO}/releases/latest`,{headers:{Accept:"application/vnd.github+json"}});
+      if(r.ok){ const j=await r.json(); info.tag=j.tag_name||null; info.url=j.html_url||null; }
+    }catch(e){}
+    store.set(LS_LATEST, JSON.stringify(info));
+  }
+  if(!info.tag || cmpVersion(info.tag, APP_VERSION)<=0) return;
+  const a=$("newver");
+  a.href=/^https:\/\/github\.com\//.test(info.url||"") ? info.url : `https://github.com/${REPO}/releases/latest`;
+  a.title=`Version ${String(info.tag).replace(/^v/,"")} is available (you have ${APP_VERSION})`;
+  a.hidden=false;
+  fitVersion();
 }
 
 /* ---------- day popover: full titles for a day ---------- */
@@ -1069,7 +1114,7 @@ $("file").onchange=async e=>{
 mq.addEventListener ? mq.addEventListener("change",render) : mq.addListener(render);
 
 (async function init(){
-  $("ver").textContent="v"+APP_VERSION;
+  $("ver").textContent=$("appverNum").textContent="v"+APP_VERSION;
   setTheme(store.get(LS_THEME)||"dark");
   setFont(store.get(LS_FONT)||"1");
   setMonths(store.get(LS_MONTHS)||"12");
@@ -1089,6 +1134,7 @@ mq.addEventListener ? mq.addEventListener("change",render) : mq.addListener(rend
   $("ctitle").value=cfg.title; $("ctitle").placeholder=defaultTitle(); $("wkst").value=String(cfg.wkst);
   renderAccounts();
   render();
+  checkForUpdate();
   if(cfgErr){ status(cfgErr,true); openPanel(); if(allCals().some(c=>c.url.trim())) loadAll(); return; }
   if(allCals().some(c=>c.url.trim())) loadAll();
   else { status("Open Settings to add your calendars and API key."); openPanel(); }
