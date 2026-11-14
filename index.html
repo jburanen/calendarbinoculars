@@ -184,7 +184,7 @@
   </div>
   <div class="hm"><div id="legend"></div><div id="status"></div></div>
   <div class="nav">
-    <select id="monthsSel" title="Months to show" aria-label="Months to show"><option value="1">1 month</option><option value="2">2 months</option><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="9">9 months</option><option value="12" selected>12 months</option></select>
+    <select id="monthsSel" title="Months to show" aria-label="Months to show"><option value="1">1 month</option><option value="2">2 months</option><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="8">8 months</option><option value="12" selected>12 months</option></select>
     <button id="singleCol" class="toggle" title="Show months in a single column" aria-label="Single column" aria-pressed="false">☰<span class="lbl"> 1 column</span></button>
     <button id="prev" class="chev" title="Previous month" aria-label="Previous month"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
     <button id="thisMonth">This Month</button>
@@ -241,7 +241,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.4";
+const APP_VERSION = "2.0.5";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -1076,8 +1076,10 @@ function setSingleCol(on){
   if(startY!=null){ hidePop(); render(); }
 }
 $("singleCol").onclick=()=>setSingleCol(!singleCol);
+const MONTH_STEPS=[1,2,3,4,6,8,12];
 function setMonths(v){
-  numMonths=[1,2,3,4,6,9,12].includes(+v)?+v:12;
+  if(+v===9) v=8;   // 9 was replaced by 8; keep a saved choice close
+  numMonths=MONTH_STEPS.includes(+v)?+v:12;
   $("monthsSel").value=String(numMonths); store.set(LS_MONTHS,String(numMonths));
   if(startY==null) return;
   hidePop();
@@ -1094,7 +1096,6 @@ $("scrim").onclick=closePanel;
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closePanel(); hidePop(); } });
 // Arrow keys: ←/→ move the start month; ↑/↓ step the month count in the multi-column
 // desktop view (in single-column and mobile views they scroll as usual).
-const MONTH_STEPS=[1,2,3,4,6,9,12];
 document.addEventListener("keydown",e=>{
   if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||startY==null) return;
   if(document.body.classList.contains("open")) return;
