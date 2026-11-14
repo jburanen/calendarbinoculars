@@ -241,7 +241,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.5";
+const APP_VERSION = "2.0.6";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -773,7 +773,7 @@ function fitLayout(n){
   // Height a day needs for its number plus two events (assumes a 6-week month, the worst case)
   const needNormal=(18+2*(15+2)+2)*fs, needTight=(14+2*(13+2))*fs;
   let best=null;
-  for(let c=1;c<=(singleCol?1:n);c++){
+  for(let c=1;c<=n;c++){
     const r=Math.ceil(n/c);
     if(c>1 && Math.ceil(n/(c-1))===r) continue;          // same rows with fewer columns: skip
     const w=(W-(c-1)*gap)/c, h=(H-(r-1)*gap)/r;
@@ -851,7 +851,7 @@ function weekRow(days, map, todayDN){
   const laneEnd=[];
   for(const sg of list){ let l=0; while(laneEnd[l]!=null && laneEnd[l]>=sg.a) l++; laneEnd[l]=sg.b; sg.lane=l; }
   const row=document.createElement("div"); row.className="week";
-  const head=days.some(d=>d.label)&&mq.matches?Math.round(28*fontScale):numLayout.head;
+  const head=days.some(d=>d.label)&&(mq.matches||singleCol)?Math.round(28*fontScale):numLayout.head;
   row.style.gridTemplateRows=`${head}px `+(laneEnd.length?`repeat(${laneEnd.length}, max-content) `:"")+"minmax(4px,1fr)";
   days.forEach((d,i)=>{
     const c=document.createElement("div"); c.style.gridColumn=String(i+1);
@@ -902,10 +902,10 @@ function render(){
   const view=$("view"); const frag=document.createDocumentFragment();
   const dowRow = cls => { const r=document.createElement("div"); r.className=cls; for(let k=0;k<7;k++){ const d=document.createElement("div"); d.className="dow"; d.textContent=dows[(k+wkst)%7]; r.appendChild(d);} return r; };
 
-  if(mq.matches){
+  if(mq.matches || singleCol){
     document.body.classList.remove("fit","tight");
     computeNumLayout(false);
-    // Mobile: one continuous run of weeks; months flow into each other
+    // Mobile, or 1 column at any size: one continuous run of weeks; months flow into each other
     const box=document.createElement("div"); box.className="stream";
     box.appendChild(dowRow("dowrow"));
     const weeks=document.createElement("div"); weeks.className="weeks";
@@ -932,7 +932,7 @@ function render(){
       if(fit.tight) document.body.classList.add("tight");
       wrap.style.gridTemplateColumns=`repeat(${fit.c},minmax(0,1fr))`;
       wrap.style.gridTemplateRows=`repeat(${fit.r},minmax(0,1fr))`;
-    } else if(singleCol) wrap.style.gridTemplateColumns="minmax(0,1fr)";   // full-width months; page scrolls
+    }
     computeNumLayout(document.body.classList.contains("tight"));
     for(let i=0;i<numMonths;i++){
       const y=startY+Math.floor((startM+i)/12), m=(startM+i)%12;
