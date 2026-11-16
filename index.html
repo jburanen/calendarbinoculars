@@ -8,12 +8,12 @@
   :root, [data-theme=dark]{
     --bg:#111215; --card:#1a1c20; --ink:#e9e9ec; --muted:#9a9ca4; --line:#2b2e34; --head:#1f2126;
     --weekend:#16181b; --blank:#141518; --today:#3b3420; --todayink:#ffd76a; --alt:#24272d;
-    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6; --pto:#3d2c5e;
+    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6; --pto:#2a2535;
   }
   [data-theme=light]{
     --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e4e2dd; --head:#fbfaf8;
     --weekend:#faf9f7; --blank:#f2f1ee; --today:#fff1c9; --todayink:#7a5600; --alt:#efede7;
-    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a; --pto:#e4d7f7;
+    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a; --pto:#f0ebf6;
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
@@ -245,7 +245,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.8";
+const APP_VERSION = "2.0.9";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
