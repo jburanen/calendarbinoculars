@@ -8,12 +8,12 @@
   :root, [data-theme=dark]{
     --bg:#111215; --card:#1a1c20; --ink:#e9e9ec; --muted:#9a9ca4; --line:#2b2e34; --head:#1f2126;
     --weekend:#16181b; --blank:#141518; --today:#3b3420; --todayink:#ffd76a; --alt:#24272d;
-    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6; --pto:#2a2535;
+    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6;
   }
   [data-theme=light]{
     --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e4e2dd; --head:#fbfaf8;
     --weekend:#faf9f7; --blank:#f2f1ee; --today:#fff1c9; --todayink:#7a5600; --alt:#efede7;
-    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a; --pto:#f0ebf6;
+    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a;
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
@@ -220,7 +220,7 @@
       <div class="row"><label for="ctitle">Title</label><input type="text" id="ctitle" placeholder="Calendar Binoculars" style="flex:1"></div>
       <div class="row"><label for="start">Start month</label><input type="month" id="start"></div>
       <div class="row"><label for="wkst">Week starts</label><select id="wkst"><option value="0">Sunday</option><option value="1">Monday</option></select></div>
-      <div class="row"><label for="ptoTitle">PTO title</label><input type="text" id="ptoTitle" placeholder="e.g. PTO" style="flex:1" title="All-day events whose title is exactly this shade the day purple instead of showing a bubble. Works for every calendar, shown or hidden."></div>
+      <div class="row" id="ptoRow"><label for="ptoTitle">PTO title</label><input type="text" id="ptoTitle" placeholder="e.g. PTO" style="flex:1" title="All-day events whose title is exactly this shade the day (in the color on the right) instead of showing a bubble. Works for every calendar, shown or hidden."><button class="swatchbtn" id="ptoSwatch" title="PTO shading color" aria-label="PTO shading color"></button></div>
       <div class="row" id="hlRow"><label for="hlText">Highlight</label><input type="text" id="hlText" placeholder="Keyword, e.g. conf* or launch" style="flex:1" title="All-day events whose title contains this text (case-sensitive; * matches anything, ? one character) use the color on the right, whatever calendar they come from."><button class="swatchbtn" id="hlSwatch" title="Highlight color" aria-label="Highlight color"></button></div>
       <div class="row"><label for="fontsize">Text size</label><select id="fontsize"><option value="0.9">Small</option><option value="1">Medium</option><option value="1.15">Large</option><option value="1.3">Extra large</option></select></div>
       <div class="row"><label for="theme">Theme</label><select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
@@ -252,7 +252,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.11";
+const APP_VERSION = "2.0.12";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -559,8 +559,8 @@ async function loadConfigFile(){
 }
 
 /* ---------- state ---------- */
-const HL_DEFAULT="#F09300";   // Mango
-let cfg = {accounts:[], title:"", wkst:0, pto:"", hlText:"", hlColor:HL_DEFAULT};   // the browser's own accounts: [{name,key,cals:[{url,color,hidden}]}]
+const HL_DEFAULT="#F09300", PTO_DEFAULT="#B39DDB";   // Mango, Wisteria
+let cfg = {accounts:[], title:"", wkst:0, pto:"", ptoColor:PTO_DEFAULT, hlText:"", hlColor:HL_DEFAULT};   // the browser's own accounts: [{name,key,cals:[{url,color,hidden}]}]
 let fileCfg = null;                          // from config.yaml (read-only): {title, accounts}
 const allAccounts = () => [...(fileCfg?fileCfg.accounts:[]), ...cfg.accounts];
 const allCals = () => allAccounts().flatMap(a=>a.cals);
@@ -592,7 +592,7 @@ function saveSettings(){
   const accounts=cfg.accounts
     .map(a=>({name:a.name||"", key:a.key.trim(), cals:a.cals.filter(c=>c.url.trim()).map(c=>({url:c.url,color:c.color,hidden:!!c.hidden}))}))
     .filter(a=>a.key||a.cals.length);
-  store.set(LS_SETTINGS, JSON.stringify({accounts, title:cfg.title, wkst:cfg.wkst, pto:cfg.pto, hlText:cfg.hlText, hlColor:cfg.hlColor}));
+  store.set(LS_SETTINGS, JSON.stringify({accounts, title:cfg.title, wkst:cfg.wkst, pto:cfg.pto, ptoColor:cfg.ptoColor, hlText:cfg.hlText, hlColor:cfg.hlColor}));
   store.del(LS_SETTINGS_V2);
 }
 // After removing things: save, or clear saved settings once no calendars are left
@@ -623,13 +623,22 @@ function renderAccounts(){
   cfg.accounts.forEach((a,ai)=>list.appendChild(accountBox(a,ai)));
   renderHL();
 }
-// Highlight rule: swatch shows its color; clicking it toggles the same picker calendars use
-let hlPickerOpen=false;
+// Highlight and PTO colors: each swatch shows its color; clicking it toggles the same picker calendars use
+let hlPickerOpen=false, ptoPickerOpen=false;
 function renderHL(){
-  const row=$("hlRow"), sw=$("hlSwatch");
-  sw.style.background=shade(cfg.hlColor);
-  const old=row.querySelector(".picker"); if(old) old.remove();
-  if(hlPickerOpen) row.appendChild(colorPicker(cfg.hlColor, hex=>{ hlPickerOpen=false; cfg.hlColor=hex; saveSettings(); renderHL(); render(); }));
+  const swatch=(rowId,swId,open,color,close,set)=>{
+    const row=$(rowId); $(swId).style.background=shade(color);
+    const old=row.querySelector(".picker"); if(old) old.remove();
+    if(open) row.appendChild(colorPicker(color, hex=>{ close(); set(hex); saveSettings(); renderHL(); render(); }));
+  };
+  swatch("hlRow","hlSwatch",hlPickerOpen,cfg.hlColor,()=>hlPickerOpen=false,h=>cfg.hlColor=h);
+  swatch("ptoRow","ptoSwatch",ptoPickerOpen,cfg.ptoColor,()=>ptoPickerOpen=false,h=>cfg.ptoColor=h);
+}
+// PTO shading: the chosen color blended into the day background, so it stays subtle in both themes
+function ptoTint(hex){
+  const dark=document.documentElement.dataset.theme==="dark";
+  const c=hexRGB(hex), bg=dark?[26,28,32]:[255,255,255], k=dark?0.15:0.2;
+  return rgbHex(c.map((v,i)=>v*k+bg[i]*(1-k)));
 }
 // Keyword → matcher: case-sensitive "contains"; * = any run of characters, ? = one character
 function hlMatcher(text){
@@ -923,6 +932,7 @@ function weekRow(days, map, todayDN, pto){
 
 function render(){
   const wkst=cfg.wkst;
+  document.documentElement.style.setProperty("--pto",ptoTint(cfg.ptoColor));
   const [winStart,winEnd]=windowRange();
   const {map,pto}=buildDayMap(winStart,winEnd);
   const now=new Date(), todayDN=DN(now.getFullYear(),now.getMonth(),now.getDate());
@@ -1144,6 +1154,7 @@ $("ctitle").oninput=e=>{ cfg.title=e.target.value; saveSettings(); render(); };
 $("ptoTitle").oninput=e=>{ cfg.pto=e.target.value; saveSettings(); hidePop(); render(); };
 $("hlText").oninput=e=>{ cfg.hlText=e.target.value; saveSettings(); hidePop(); render(); };
 $("hlSwatch").onclick=()=>{ hlPickerOpen=!hlPickerOpen; renderHL(); };
+$("ptoSwatch").onclick=()=>{ ptoPickerOpen=!ptoPickerOpen; renderHL(); };
 $("addAcct").onclick=addAccount;
 $("applyBtn").onclick=()=>{ saveSettings(); cfg.accounts.forEach(a=>a.editKey=false); renderAccounts(); loadAll(); };
 $("openSettings").onclick=openPanel;
@@ -1169,10 +1180,10 @@ document.addEventListener("keydown",e=>{
 let rT; window.addEventListener("resize",()=>{ clearTimeout(rT); rT=setTimeout(()=>{ hidePop(); render(); },150); });
 $("forget").onclick=()=>{
   store.del(LS_SETTINGS); store.del(LS_SETTINGS_V2); store.del(LS_HIDDEN_CFG);
-  cfg={accounts:[],title:"",wkst:0,pto:"",hlText:"",hlColor:HL_DEFAULT}; fileCals=[]; loaded=[]; apiRange=null;
+  cfg={accounts:[],title:"",wkst:0,pto:"",ptoColor:PTO_DEFAULT,hlText:"",hlColor:HL_DEFAULT}; fileCals=[]; loaded=[]; apiRange=null;
   allCals().forEach(c=>c.hidden=false);
   if(!fileCfg) cfg.accounts.push(newAccount());
-  $("ctitle").value=""; $("wkst").value="0"; $("ptoTitle").value=""; $("hlText").value=""; hlPickerOpen=false;
+  $("ctitle").value=""; $("wkst").value="0"; $("ptoTitle").value=""; $("hlText").value=""; hlPickerOpen=ptoPickerOpen=false;
   renderAccounts(); render(); status("Saved settings cleared.");
   if(fileCfg) loadAll();                 // calendars from config.yaml stay
 };
@@ -1201,7 +1212,7 @@ mq.addEventListener ? mq.addEventListener("change",render) : mq.addListener(rend
   const saved=loadSettings();
   if(saved){ cfg={
     accounts:saved.accounts.map(a=>({name:a.name||"", key:a.key||"", cals:(a.cals||[]).map(c=>({url:c.url||"", color:c.color||PALETTE[0], hidden:!!c.hidden}))})),
-    title:saved.title||"", wkst:+saved.wkst||0, pto:saved.pto||"", hlText:saved.hlText||"", hlColor:normHex(saved.hlColor)||HL_DEFAULT}; }
+    title:saved.title||"", wkst:+saved.wkst||0, pto:saved.pto||"", ptoColor:normHex(saved.ptoColor)||PTO_DEFAULT, hlText:saved.hlText||"", hlColor:normHex(saved.hlColor)||HL_DEFAULT}; }
   let cfgErr=null;
   try{ fileCfg=await loadConfigFile(); }catch(e){ cfgErr="config.yaml: "+e.message; }
   if(!cfg.accounts.length && !fileCfg) cfg.accounts.push(newAccount());
