@@ -8,12 +8,12 @@
   :root, [data-theme=dark]{
     --bg:#111215; --card:#1a1c20; --ink:#e9e9ec; --muted:#9a9ca4; --line:#2b2e34; --head:#1f2126;
     --weekend:#16181b; --blank:#141518; --today:#3b3420; --todayink:#ffd76a; --alt:#24272d;
-    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6;
+    --accent:#6ea8ff; --input:#14161a; --panel:#17191d; --shadow:0 10px 40px rgba(0,0,0,.5); --edge:#8aa6d6; --pto:#3d2c5e;
   }
   [data-theme=light]{
     --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e4e2dd; --head:#fbfaf8;
     --weekend:#faf9f7; --blank:#f2f1ee; --today:#fff1c9; --todayink:#7a5600; --alt:#efede7;
-    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a;
+    --accent:#2f5d8a; --input:#fff; --panel:#fff; --shadow:0 10px 40px rgba(0,0,0,.18); --edge:#2f5d8a; --pto:#e4d7f7;
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
@@ -83,6 +83,8 @@
   .day.today{background:var(--today)}
   .num{font-size:calc(11px * var(--fs,1));line-height:1;color:var(--muted);padding:var(--numpad,2px) 5px 0;white-space:nowrap;overflow:hidden}
   .num b{color:var(--ink);font-weight:700;margin-right:3px}
+  /* PTO days: whole day shaded purple (beats weekend/today/alt-month shading) */
+  .day.pto{background:var(--pto)!important}
   .day.today .num{color:var(--todayink);font-weight:700}
   .ev{position:relative;z-index:1;min-width:0;font-size:calc(11px * var(--fs,1));line-height:1.25;padding:2px 4px;margin:1px 3px;border-radius:4px;
       overflow:hidden;display:block;white-space:nowrap;text-overflow:ellipsis;align-self:start;cursor:pointer}
@@ -172,7 +174,7 @@
     .nav,#status,#panel,#scrim{display:none}
     html,body{background:#fff;color:#000}
     #months{grid-template-columns:repeat(3,1fr);gap:10px}
-    .ev{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .ev,.day.pto{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
@@ -212,6 +214,7 @@
       <div class="row"><label for="ctitle">Title</label><input type="text" id="ctitle" placeholder="Calendar Binoculars" style="flex:1"></div>
       <div class="row"><label for="start">Start month</label><input type="month" id="start"></div>
       <div class="row"><label for="wkst">Week starts</label><select id="wkst"><option value="0">Sunday</option><option value="1">Monday</option></select></div>
+      <div class="row"><label for="ptoTitle">PTO title</label><input type="text" id="ptoTitle" placeholder="e.g. PTO" style="flex:1" title="All-day events whose title is exactly this shade the day purple instead of showing a bubble. Works for every calendar, shown or hidden."></div>
       <div class="row"><label for="fontsize">Text size</label><select id="fontsize"><option value="0.9">Small</option><option value="1">Medium</option><option value="1.15">Large</option><option value="1.3">Extra large</option></select></div>
       <div class="row"><label for="theme">Theme</label><select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
     </div>
@@ -242,7 +245,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.7";
+const APP_VERSION = "2.0.8";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -549,7 +552,7 @@ async function loadConfigFile(){
 }
 
 /* ---------- state ---------- */
-let cfg = {accounts:[], title:"", wkst:0};   // the browser's own accounts: [{name,key,cals:[{url,color,hidden}]}]
+let cfg = {accounts:[], title:"", wkst:0, pto:""};   // the browser's own accounts: [{name,key,cals:[{url,color,hidden}]}]
 let fileCfg = null;                          // from config.yaml (read-only): {title, accounts}
 const allAccounts = () => [...(fileCfg?fileCfg.accounts:[]), ...cfg.accounts];
 const allCals = () => allAccounts().flatMap(a=>a.cals);
@@ -581,7 +584,7 @@ function saveSettings(){
   const accounts=cfg.accounts
     .map(a=>({name:a.name||"", key:a.key.trim(), cals:a.cals.filter(c=>c.url.trim()).map(c=>({url:c.url,color:c.color,hidden:!!c.hidden}))}))
     .filter(a=>a.key||a.cals.length);
-  store.set(LS_SETTINGS, JSON.stringify({accounts, title:cfg.title, wkst:cfg.wkst}));
+  store.set(LS_SETTINGS, JSON.stringify({accounts, title:cfg.title, wkst:cfg.wkst, pto:cfg.pto}));
   store.del(LS_SETTINGS_V2);
 }
 // After removing things: save, or clear saved settings once no calendars are left
@@ -793,11 +796,15 @@ function fitLayout(n){
 function isHidden(c){ return !!(c.ref ? c.ref.hidden : c.hidden); }
 function setHidden(c,v){ if(c.ref){ c.ref.hidden=v; c.ref.managed ? saveConfigHidden() : saveSettings(); } else c.hidden=v; }
 
+// Returns {map: dn → events to draw, pto: Set of PTO day numbers}. An all-day event whose title
+// exactly equals the PTO title (surrounding spaces ignored) shades its days instead of drawing a
+// bubble. PTO matching scans every loaded calendar, including hidden ones.
 function buildDayMap(winStart, winEnd){
-  const map=new Map();
+  const map=new Map(), pto=new Set(), ptoTitle=(cfg.pto||"").trim();
   const add=(dn,item)=>{ if(!map.has(dn)) map.set(dn,[]); map.get(dn).push(item); };
   loaded.forEach((cal,ci)=>{
-    if(isHidden(cal)) return;
+    const hid=isHidden(cal);
+    if(hid && !ptoTitle) return;
     const overrides=new Map();
     cal.events.forEach(e=>{ if(e.recurId!=null && e.uid){ if(!overrides.has(e.uid)) overrides.set(e.uid,new Set()); overrides.get(e.uid).add(e.recurId); } });
     const bgc=shade(cal.color), fg=textOn(bgc);
@@ -807,7 +814,10 @@ function buildDayMap(winStart, winEnd){
       const dur=durationDays(ev,start);
       const skip=(ev.recurId==null && ev.uid && overrides.get(ev.uid)) || new Set();
       const title=ev.summary||"(No title)";
+      const isPto=!!ptoTitle && title.trim()===ptoTitle;
+      if(hid && !isPto) continue;
       for(const s of expand(ev,start,dur,winStart,winEnd,skip)){
+        if(isPto){ for(let dn=Math.max(s,winStart); dn<Math.min(s+dur,winEnd); dn++) pto.add(dn); continue; }
         for(let dn=Math.max(s,winStart); dn<Math.min(s+dur,winEnd); dn++){
           add(dn,{title,color:bgc,fg,ci,cal:cal.name,cont:dn>s,more:dn<s+dur-1,sort:s,dur});
         }
@@ -815,7 +825,7 @@ function buildDayMap(winStart, winEnd){
     }
   });
   for(const list of map.values()) list.sort((a,b)=>b.dur-a.dur||a.sort-b.sort||a.ci-b.ci||a.title.localeCompare(b.title));
-  return map;
+  return {map, pto};
 }
 
 // Place day numbers so the gap above the digits equals the gap between the digits and the first event.
@@ -840,7 +850,7 @@ function computeNumLayout(tight){
 }
 
 // Render one week row. days: 7 entries {dn|null, cls, label}. Events get fixed lanes so bars line up.
-function weekRow(days, map, todayDN){
+function weekRow(days, map, todayDN, pto){
   const segs=new Map();
   days.forEach((d,i)=>{ if(d.dn==null) return;
     for(const it of (map.get(d.dn)||[])){
@@ -858,7 +868,7 @@ function weekRow(days, map, todayDN){
     const c=document.createElement("div"); c.style.gridColumn=String(i+1);
     if(d.dn==null){ c.className="day "+(d.cls||"blank"); row.appendChild(c); return; }
     const wd=wdOf(d.dn);
-    c.className="day"+((wd===0||wd===6)?" we":"")+(d.dn===todayDN?" today":"")+(d.cls?" "+d.cls:"");
+    c.className="day"+((wd===0||wd===6)?" we":"")+(d.dn===todayDN?" today":"")+(pto.has(d.dn)?" pto":"")+(d.cls?" "+d.cls:"");
     const n=document.createElement("div"); n.className="num";
     if(d.label){ const b=document.createElement("b"); b.textContent=d.label; n.appendChild(b); }
     n.appendChild(document.createTextNode(String(fromDN(d.dn).d)));
@@ -878,7 +888,7 @@ function weekRow(days, map, todayDN){
 function render(){
   const wkst=cfg.wkst;
   const [winStart,winEnd]=windowRange();
-  const map=buildDayMap(winStart,winEnd);
+  const {map,pto}=buildDayMap(winStart,winEnd);
   const now=new Date(), todayDN=DN(now.getFullYear(),now.getMonth(),now.getDate());
   const dows=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const fmtM=new Intl.DateTimeFormat(undefined,{month:"long"});
@@ -920,7 +930,7 @@ function render(){
         if((((f.y-startY)*12+f.m-startM)%2)===1) cls.push("alt");
         days.push({dn, cls:cls.join(" "), label:(f.d===1||dn===winStart)?fmtS.format(new Date(f.y,f.m,1))+(f.m===0?" '"+String(f.y).slice(2):""):null});
       }
-      weeks.appendChild(weekRow(days,map,todayDN));
+      weeks.appendChild(weekRow(days,map,todayDN,pto));
     }
     box.appendChild(weeks); frag.appendChild(box);
   } else {
@@ -947,20 +957,20 @@ function render(){
       for(let w=-lead; w<dim; w+=7){
         const days=[];
         for(let k=0;k<7;k++){ const d=w+k; days.push(d>=0&&d<dim?{dn:firstDn+d}:{dn:null}); }
-        weeks.appendChild(weekRow(days,map,todayDN));
+        weeks.appendChild(weekRow(days,map,todayDN,pto));
       }
       sec.appendChild(weeks); wrap.appendChild(sec);
     }
     frag.appendChild(wrap);
   }
   view.replaceChildren(frag);
-  lastMap=map;
+  lastMap=map; lastPto=pto;
   requestAnimationFrame(markHidden);
   fitVersion();
 }
 
 // When events don't fit in a fitted month, show "+N" on the affected days (click to see all)
-let lastMap=new Map();
+let lastMap=new Map(), lastPto=new Set();
 function markHidden(){
   if(!document.body.classList.contains("fit") || mq.matches) return;
   document.querySelectorAll("#months .week").forEach(w=>{
@@ -1016,11 +1026,12 @@ async function checkForUpdate(){
 
 /* ---------- day popover: full titles for a day ---------- */
 function showDay(dn, x, y){
-  const items=lastMap.get(dn)||[];
-  if(!items.length){ hidePop(); return; }              // empty day: no popup
+  const items=lastMap.get(dn)||[], isPto=lastPto.has(dn);
+  if(!items.length && !isPto){ hidePop(); return; }    // empty day: no popup
   const pop=$("pop"); pop.replaceChildren();
   const f=fromDN(dn);
   const h=document.createElement("h5"); h.textContent=new Intl.DateTimeFormat(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"}).format(new Date(f.y,f.m,f.d)); pop.appendChild(h);
+  if(isPto){ const r=document.createElement("div"); r.className="it"; const i=document.createElement("i"); i.style.background="var(--pto)"; i.style.boxShadow="inset 0 0 0 1px var(--muted)"; const t=document.createElement("div"); t.textContent=cfg.pto.trim(); r.append(i,t); pop.appendChild(r); }
   const fmt=new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric"});
   for(const it of items){
     const r=document.createElement("div"); r.className="it";
@@ -1088,6 +1099,7 @@ function setMonths(v){
   if(apiRange && (a<apiRange.s || b>apiRange.e)){ render(); loadAll(); } else render();
 }
 $("ctitle").oninput=e=>{ cfg.title=e.target.value; saveSettings(); render(); };
+$("ptoTitle").oninput=e=>{ cfg.pto=e.target.value; saveSettings(); hidePop(); render(); };
 $("addAcct").onclick=addAccount;
 $("applyBtn").onclick=()=>{ saveSettings(); cfg.accounts.forEach(a=>a.editKey=false); renderAccounts(); loadAll(); };
 $("openSettings").onclick=openPanel;
@@ -1113,10 +1125,10 @@ document.addEventListener("keydown",e=>{
 let rT; window.addEventListener("resize",()=>{ clearTimeout(rT); rT=setTimeout(()=>{ hidePop(); render(); },150); });
 $("forget").onclick=()=>{
   store.del(LS_SETTINGS); store.del(LS_SETTINGS_V2); store.del(LS_HIDDEN_CFG);
-  cfg={accounts:[],title:"",wkst:0}; fileCals=[]; loaded=[]; apiRange=null;
+  cfg={accounts:[],title:"",wkst:0,pto:""}; fileCals=[]; loaded=[]; apiRange=null;
   allCals().forEach(c=>c.hidden=false);
   if(!fileCfg) cfg.accounts.push(newAccount());
-  $("ctitle").value=""; $("wkst").value="0";
+  $("ctitle").value=""; $("wkst").value="0"; $("ptoTitle").value="";
   renderAccounts(); render(); status("Saved settings cleared.");
   if(fileCfg) loadAll();                 // calendars from config.yaml stay
 };
@@ -1145,11 +1157,11 @@ mq.addEventListener ? mq.addEventListener("change",render) : mq.addListener(rend
   const saved=loadSettings();
   if(saved){ cfg={
     accounts:saved.accounts.map(a=>({name:a.name||"", key:a.key||"", cals:(a.cals||[]).map(c=>({url:c.url||"", color:c.color||PALETTE[0], hidden:!!c.hidden}))})),
-    title:saved.title||"", wkst:+saved.wkst||0}; }
+    title:saved.title||"", wkst:+saved.wkst||0, pto:saved.pto||""}; }
   let cfgErr=null;
   try{ fileCfg=await loadConfigFile(); }catch(e){ cfgErr="config.yaml: "+e.message; }
   if(!cfg.accounts.length && !fileCfg) cfg.accounts.push(newAccount());
-  $("ctitle").value=cfg.title; $("ctitle").placeholder=defaultTitle(); $("wkst").value=String(cfg.wkst);
+  $("ctitle").value=cfg.title; $("ctitle").placeholder=defaultTitle(); $("wkst").value=String(cfg.wkst); $("ptoTitle").value=cfg.pto;
   renderAccounts();
   render();
   checkForUpdate();

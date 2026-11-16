@@ -43,7 +43,7 @@ docker compose up -d                              # http://localhost:8082
 ## How the app works
 
 - **Settings live in the browser's `localStorage`** (`adc.*` keys). `adc.settings.v3` holds
-  `{accounts:[{name,key,cals:[{url,color,hidden}]}], title, wkst}`. Each account's
+  `{accounts:[{name,key,cals:[{url,color,hidden}]}], title, wkst, pto}`. Each account's
   calendars load with that account's API key. The older `adc.settings.v2` format
   (`{key,cals}`) is migrated into a single account. Theme, text size and month count have
   their own keys. Settings are saved only once some account has an API key and there is at
@@ -59,6 +59,9 @@ docker compose up -d                              # http://localhost:8082
   `singleEvents=true` and all-day events only. Without a key, or for non-Google feeds, the
   app fetches the `.ics` file directly and then falls back to the CORS relays in `PROXIES`.
   The app has its own ICS parser and RRULE expander.
+- **PTO days:** an all-day event whose title exactly equals `cfg.pto` (trimmed, case-sensitive)
+  is not drawn as a bubble; `buildDayMap()` adds its days to a `pto` set instead, and those
+  `.day` cells get the purple `.pto` shading. This scans every loaded calendar, hidden ones too.
 - **Dates** are day numbers (`DN`, days since the epoch in UTC), which avoids timezone and
   DST bugs.
 - **Desktop:** month cards. `fitLayout()` picks the columns × rows that fill the window
