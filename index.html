@@ -166,7 +166,8 @@
     h1{font-size:18px}
     #legend,#status{padding-left:12px;padding-right:12px}
     .hm{order:3;flex-basis:100%}
-    .nav{gap:5px}
+    .nav{gap:5px;flex-wrap:wrap}
+    .nav button.chev{padding:0 6px;min-width:30px}
     .nav .lbl{display:none}
     #singleCol{display:none}          /* mobile is always one continuous column */
   }
@@ -189,9 +190,11 @@
   <div class="nav">
     <select id="monthsSel" title="Months to show" aria-label="Months to show"><option value="1">1 month</option><option value="2">2 months</option><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="8">8 months</option><option value="12" selected>12 months</option></select>
     <button id="singleCol" class="toggle" title="Show months in a single column" aria-label="Single column" aria-pressed="false">☰<span class="lbl"> 1 column</span></button>
+    <button id="prevPage" class="chev" title="Back one page" aria-label="Back one page"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3 3 8l5 5M13 3 8 8l5 5"/></svg></button>
     <button id="prev" class="chev" title="Previous month" aria-label="Previous month"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
     <button id="thisMonth">This Month</button>
     <button id="next" class="chev" title="Next month" aria-label="Next month"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
+    <button id="nextPage" class="chev" title="Forward one page" aria-label="Forward one page"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l5 5-5 5M8 3l5 5-5 5"/></svg></button>
     <button id="openSettings" title="Settings" aria-label="Settings">⚙︎<span class="lbl"> Settings</span></button>
   </div>
 </header>
@@ -245,7 +248,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.9";
+const APP_VERSION = "2.0.10";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -1075,6 +1078,9 @@ function shift(n){
 }
 $("prev").onclick=()=>shift(-1);
 $("next").onclick=()=>shift(1);
+// Double chevrons: jump a whole page, i.e. as many months as are shown
+$("prevPage").onclick=()=>shift(-numMonths);
+$("nextPage").onclick=()=>shift(numMonths);
 $("thisMonth").onclick=()=>{ const n=new Date(); startY=n.getFullYear(); startM=n.getMonth(); shift(0); };
 $("start").onchange=e=>{ const m=/^(\d{4})-(\d{2})$/.exec(e.target.value); if(m){ startY=+m[1]; startM=+m[2]-1; shift(0);} };
 $("wkst").onchange=e=>{ cfg.wkst=+e.target.value; saveSettings(); render(); };
@@ -1093,6 +1099,9 @@ function setMonths(v){
   if(+v===9) v=8;   // 9 was replaced by 8; keep a saved choice close
   numMonths=MONTH_STEPS.includes(+v)?+v:12;
   $("monthsSel").value=String(numMonths); store.set(LS_MONTHS,String(numMonths));
+  const pg=numMonths===1?"1 month":numMonths+" months";
+  $("prevPage").title=$("prevPage").ariaLabel="Back "+pg;
+  $("nextPage").title=$("nextPage").ariaLabel="Forward "+pg;
   if(startY==null) return;
   hidePop();
   const [a,b]=windowRange();
