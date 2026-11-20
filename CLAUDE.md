@@ -48,8 +48,9 @@ docker compose up -d                              # http://localhost:8082
   (`{key,cals}`) is migrated into a single account. Theme, text size and month count have
   their own keys. Settings are saved only once some account has an API key and there is at
   least one calendar.
-- **config.yaml:** `loadConfigFile()` reads it into `fileCfg`. A 404 or fetch failure means
-  there's no config, which is not an error. The file is parsed by a built-in YAML-subset
+- **config.yaml:** `loadConfigFile()` reads it into `fileCfg`. A 404, a network failure
+  (e.g. opened as a local file) or an HTML fallback page means there's no config, which is not
+  an error. Any other HTTP error (e.g. a 403 from a firewall) is shown as a `config.yaml:` error. The file is parsed by a built-in YAML-subset
   parser (`parseYAML`) to stay dependency-free. Config accounts are flagged `managed`: they
   render read-only (`configBox`) and are never written to `adc.settings.v3`. Their
   hidden/shown state lives in `adc.hidden.config` (a list of URLs). `allAccounts()` is the

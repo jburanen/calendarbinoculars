@@ -252,7 +252,7 @@
 <script>
 /* ================= CONFIG ================= */
 // Kept in sync with the VERSION file by .githooks/pre-commit. Don't edit by hand.
-const APP_VERSION = "2.0.12";
+const APP_VERSION = "2.0.13";
 // Fallback CORS relays, used only when there's no API key (or for non-Google feeds).
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -552,7 +552,8 @@ function configFromYAML(doc){
 async function loadConfigFile(){
   let r;
   try{ r=await fetch("config.yaml",{cache:"no-store"}); }catch(e){ return null; }   // e.g. opened as a local file
-  if(!r.ok) return null;                                                            // no config.yaml: that's fine
+  if(r.status===404) return null;                                                   // no config.yaml: that's fine
+  if(!r.ok) throw new Error(`couldn't load it (HTTP ${r.status}${r.statusText?" "+r.statusText:""})`);   // e.g. blocked by a proxy or firewall
   const text=await r.text();
   if(/^\s*</.test(text)) return null;                                               // a server's HTML fallback page, not YAML
   return configFromYAML(parseYAML(text));
